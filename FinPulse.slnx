@@ -1,4 +1,4 @@
 <Solution>
-  <Project Path="../FinPulse.UI/FinPulse.UI.csproj" />
-  <Project Path="FinPulse.csproj" />
+  <Project Path="FinPulse.csproj" Id="b4b99ead-b8c4-49a9-8188-feac8056c560" />
+  <Project Path="FinPulse.UI/FinPulse.UI.csproj" Id="4c16054f-f4cb-4987-adb4-8cd1bd0242bf" />
 </Solution>

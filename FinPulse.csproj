@@ -223,7 +223,7 @@
     <AppDesigner Include="Properties\" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\FinPulse.UI\FinPulse.UI.csproj">
+    <ProjectReference Include="FinPulse.UI\FinPulse.UI.csproj">
       <Project>{4c16054f-f4cb-4987-adb4-8cd1bd0242bf}</Project>
       <Name>FinPulse.UI</Name>
     </ProjectReference>
