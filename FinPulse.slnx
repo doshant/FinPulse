@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="../FinPulse.UI/FinPulse.UI.csproj" />
+  <Project Path="FinPulse.csproj" />
+</Solution>
