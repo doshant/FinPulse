@@ -57,6 +57,24 @@ namespace FinPulse.UI
 
         /// <summary>True (the default) lists the latest period first, in the table and on the chart.</summary>
         public bool NewestFirst { get { return NewestOption.IsChecked == true; } }
+
+        private CompareBy SelectedCompare
+        {
+            get
+            {
+                return CompareSegment.IsChecked == true ? CompareBy.Segment
+                     : CompareCountry.IsChecked == true ? CompareBy.Country : CompareBy.None;
+            }
+        }
+
+        private GrowthView SelectedGrowth
+        {
+            get
+            {
+                return GrowthPrevious.IsChecked == true ? GrowthView.VsPrevious
+                     : GrowthYear.IsChecked == true ? GrowthView.VsYearAgo : GrowthView.Value;
+            }
+        }
         public QueryResult CurrentResult { get { return _result; } }
 
         // ------------------------------------------------------------------
@@ -123,6 +141,8 @@ namespace FinPulse.UI
                 rb.IsChecked = Convert.ToString(rb.Tag) == "6";
             ColumnOption.IsChecked = true;
             NewestOption.IsChecked = true;
+            GrowthValue.IsChecked = true;
+            CompareNone.IsChecked = true;
             _ready = true;
             Refresh();
         }
@@ -131,10 +151,41 @@ namespace FinPulse.UI
         {
             if (_rows == null || _result == null) return;
 
-            bool percent = _result.Metric.Kind == ValueKind.Percent;
             var sb = new StringBuilder();
-            sb.AppendLine("Period\t" + (percent ? "Value (%)" : "Value (USD thousands)") +
-                          "\t" + (percent ? "Change (pp)" : "Change (%)") + "\tComplete");
+
+            if (_result.CompareSeries != null && _result.CompareSeries.Count > 0)
+            {
+                // Comparing: one column per segment or country, periods down the side.
+                List<QueryResult> cols = _result.CompareSeries;
+                sb.AppendLine("Period\t" + string.Join("\t", cols.Select(c => c.SeriesName)));
+                int count = cols[0].Points.Count;
+                IEnumerable<int> order2 = NewestFirst ? Enumerable.Range(0, count).Reverse() : Enumerable.Range(0, count);
+                foreach (int i in order2)
+                {
+                    sb.AppendLine(cols[0].Points[i].Label + "\t" + string.Join("\t", cols.Select(c =>
+                        c.Points[i].Value.HasValue ? c.Points[i].Value.Value.ToString("0.###", CultureInfo.InvariantCulture) : "")));
+                }
+                try
+                {
+                    Clipboard.SetText(sb.ToString());
+                    StatusText.Text = "Copied the comparison table. Paste it into Excel.";
+                    StatusText.Foreground = MutedBrush;
+                }
+                catch (ExternalException)
+                {
+                    StatusText.Text = "Another app is using the clipboard. Try again in a moment.";
+                    StatusText.Foreground = NegativeBrush;
+                }
+                return;
+            }
+
+            // Growth views: the value column holds the underlying value, the change column the % (or pp) change.
+            MetricInfo vm = _result.BaseMetric ?? _result.Metric;
+            bool percent = vm.Kind == ValueKind.Percent;
+            string changeHeader = _result.Metric.IsChange
+                ? (_result.Query.Growth == GrowthView.VsPrevious ? "Change vs previous" : "Change vs last year") + " (" + _result.Metric.ChangeUnit.Trim() + ")"
+                : (percent ? "Change (pp)" : "Change (%)");
+            sb.AppendLine("Period\t" + (percent ? "Value (%)" : "Value (USD thousands)") + "\t" + changeHeader + "\tComplete");
 
             foreach (ResultRow row in _rows)   // same order as the table on screen
             {
@@ -170,7 +221,7 @@ namespace FinPulse.UI
                 Query q = BuildQuery();
                 QueryResult result = FinanceEngine.Run(_data, q);
 
-                ShowResult(result, FinanceEngine.SamePeriodLastYear(_data, q));
+                ShowResult(result, FinanceEngine.SamePeriodLastYear(_data, result.Query));
 
                 EventHandler<QueryResult> handler = ResultChanged;
                 if (handler != null) handler(this, result);
@@ -196,13 +247,19 @@ namespace FinPulse.UI
                     : _data.Months.Count;
             }
 
+            // When comparing by segment (or country) every one is drawn, so that picker is not used.
+            SegmentCombo.IsEnabled = SelectedCompare != CompareBy.Segment;
+            CountryCombo.IsEnabled = SelectedCompare != CompareBy.Country;
+
             return new Query
             {
                 MetricKey = SelectedTag(MetricCombo),
                 Segment = SelectedTag(SegmentCombo),
                 Country = SelectedTag(CountryCombo),
                 Frequency = freq,
-                Periods = n
+                Periods = n,
+                CompareBy = SelectedCompare,
+                Growth = SelectedGrowth
             };
         }
 
@@ -249,7 +306,7 @@ namespace FinPulse.UI
             ChangeChipText.Text = d.Text;
             ChangeChipText.Foreground = d.Brush;
 
-            if (yearAgo.HasValue && latest.Value.HasValue && !(latest.IsPartial && IsFlowTotal(metric)))
+            if (yearAgo.HasValue && latest.Value.HasValue && !metric.IsChange && !(latest.IsPartial && IsFlowTotal(metric)))
             {
                 Delta y = ComputeDelta(latest.Value.Value, yearAgo.Value, metric);
                 YoyText.Text = "Same period last year: " + FormatValue(yearAgo.Value, metric) + "  (" + y.Text + ")";
@@ -269,6 +326,11 @@ namespace FinPulse.UI
 
             SourceBadge.Visibility = Visibility.Collapsed;
 
+            bool comparing = result.CompareSeries != null && result.CompareSeries.Count > 0;
+            bool dual = !comparing && result.BaseMetric != null;   // growth view, single series: value and change side by side
+            PeriodHeader.Text = !comparing ? "Period" : (SelectedCompare == CompareBy.Segment ? "Segment" : "Country");
+            ChangeHeader.Text = dual ? (result.Query.Growth == GrowthView.VsPrevious ? "vs previous" : "vs last year") : "Change";
+
             // --- Table, in the order chosen in the pane (newest first by default)
             var rows = new List<ResultRow>();
             IEnumerable<int> order = NewestFirst ? Enumerable.Range(0, n).Reverse() : Enumerable.Range(0, n);
@@ -286,7 +348,19 @@ namespace FinPulse.UI
                     ChangeText = "—",
                     ChangeBrush = MutedBrush
                 };
-                if (i > 0 && p.Value.HasValue && pts[i - 1].Value.HasValue && NotComparable(p, pts[i - 1], metric))
+                if (dual)
+                {
+                    row.ValueText = p.RawValue.HasValue ? FormatValue(p.RawValue.Value, result.BaseMetric) : "—";
+                    row.RawValue = p.RawValue;
+                    if (p.Value.HasValue)
+                    {
+                        Delta cd = FromChange(p.Value.Value, metric);
+                        row.ChangeText = cd.Text;
+                        row.ChangeBrush = cd.Brush;
+                        row.RawChange = p.Value.Value;
+                    }
+                }
+                else if (i > 0 && p.Value.HasValue && pts[i - 1].Value.HasValue && NotComparable(p, pts[i - 1], metric))
                 {
                     row.ChangeText = "n/c";
                 }
@@ -299,9 +373,15 @@ namespace FinPulse.UI
                 }
                 rows.Add(row);
             }
+            if (comparing)
+            {
+                rows = BuildRanking(result, metric);
+            }
             _rows = rows;
 
-            ValueHeader.Text = percent ? "Value (%)" : "Value (USD k)";
+            ValueHeader.Text = comparing ? "Latest, " + latest.Label
+                             : dual ? (result.BaseMetric.Kind == ValueKind.Percent ? "Value (%)" : "Value (USD k)")
+                             : metric.IsChange ? "Change" : percent ? "Value (%)" : "Value (USD k)";
             ResultsList.ItemsSource = rows;
             ResultsHeader.Visibility = Visibility.Visible;
             EmptyResults.Visibility = Visibility.Collapsed;
@@ -311,11 +391,14 @@ namespace FinPulse.UI
             ShowQuality(result);
 
             // --- Takeaways and status
-            InsightText.Text = BuildInsight(result);
+            InsightText.Text = BuildInsight(result) + (comparing ? " " + BuildCompareInsight(result) : "");
             InsightNoteBox.Visibility = Visibility.Collapsed;
 
             StatusText.Text = n + (result.Query.Frequency == Frequency.Quarterly ? " quarters" : " months") +
-                              " ending " + latest.Label + ". Chart updated on the Dashboard sheet.";
+                              " ending " + latest.Label +
+                              (comparing ? ", comparing " + result.CompareSeries.Count + " " +
+                                           (SelectedCompare == CompareBy.Segment ? "segments" : "countries") : "") +
+                              ". Chart updated on the Dashboard sheet.";
             StatusText.Foreground = MutedBrush;
         }
 
@@ -439,6 +522,76 @@ namespace FinPulse.UI
         // Helpers
         // ------------------------------------------------------------------
 
+        /// <summary>One row per segment or country, best latest value first.</summary>
+        private List<ResultRow> BuildRanking(QueryResult result, MetricInfo metric)
+        {
+            var items = result.CompareSeries
+                .Select(sr => new { Series = sr, Latest = sr.Points[sr.Points.Count - 1] })
+                .OrderByDescending(x => x.Latest.Value.HasValue ? x.Latest.Value.Value : double.NegativeInfinity)
+                .ToList();
+
+            var rows = new List<ResultRow>();
+            foreach (var x in items)
+            {
+                PeriodPoint prev = x.Series.Points.Count > 1 ? x.Series.Points[x.Series.Points.Count - 2] : null;
+                var row = new ResultRow
+                {
+                    Period = x.Series.SeriesName,
+                    ValueText = x.Latest.Value.HasValue ? FormatValue(x.Latest.Value.Value, metric) : "—",
+                    RawValue = x.Latest.Value,
+                    IsLatest = rows.Count == 0,                       // the leader gets the highlight
+                    Detail = x.Latest.Detail,
+                    FlagVisibility = x.Latest.IsIncomplete ? Visibility.Visible : Visibility.Collapsed,
+                    ChangeText = "—",
+                    ChangeBrush = MutedBrush
+                };
+                if (prev != null && x.Latest.Value.HasValue && prev.Value.HasValue && !NotComparable(x.Latest, prev, metric))
+                {
+                    Delta d = ComputeDelta(x.Latest.Value.Value, prev.Value.Value, metric);
+                    row.ChangeText = d.Text;
+                    row.ChangeBrush = d.Brush;
+                    row.RawChange = d.Raw;
+                }
+                rows.Add(row);
+            }
+            return rows;
+        }
+
+        private static string BuildCompareInsight(QueryResult result)
+        {
+            MetricInfo metric = result.Metric;
+            var series = result.CompareSeries.Where(sr => sr.Points.Count > 0 && sr.Points[sr.Points.Count - 1].Value.HasValue).ToList();
+            if (series.Count < 2) return string.Empty;
+
+            string latestLabel = series[0].Points[series[0].Points.Count - 1].Label;
+            var best = metric.HigherIsBetter
+                ? series.OrderByDescending(sr => sr.Points[sr.Points.Count - 1].Value.Value).First()
+                : series.OrderBy(sr => sr.Points[sr.Points.Count - 1].Value.Value).First();
+            var high = series.OrderByDescending(sr => sr.Points[sr.Points.Count - 1].Value.Value).First();
+
+            var sb = new StringBuilder();
+            sb.Append("In " + latestLabel + ", " + high.SeriesName + " is highest (" +
+                      FormatValue(high.Points[high.Points.Count - 1].Value.Value, metric) + ").");
+
+            // Over the whole window, who moved most? Skipped when the view is already a change, or a flow total is part-quarter.
+            if (!metric.IsChange)
+            {
+                Delta bestMove = default(Delta);
+                string bestName = null;
+                foreach (QueryResult sr in series)
+                {
+                    PeriodPoint first = sr.Points.FirstOrDefault(p => p.Value.HasValue && !(p.IsPartial && IsFlowTotal(metric)));
+                    PeriodPoint last = sr.Points.LastOrDefault(p => p.Value.HasValue && !(p.IsPartial && IsFlowTotal(metric)));
+                    if (first == null || last == null || ReferenceEquals(first, last)) continue;
+                    Delta d = ComputeDelta(last.Value.Value, first.Value.Value, metric);
+                    if (bestName == null || d.Raw > bestMove.Raw) { bestName = sr.SeriesName; bestMove = d; }
+                }
+                if (bestName != null && Math.Abs(bestMove.Raw) >= 0.05)
+                    sb.Append(" Biggest rise over the period: " + bestName + " (" + (bestMove.Raw > 0 ? "+" : "−") + bestMove.Magnitude + ").");
+            }
+            return sb.ToString();
+        }
+
         /// <summary>Revenue and expenses add up over a period. Loans and ratios do not.</summary>
         private static bool IsFlowTotal(MetricInfo metric)
         {
@@ -504,8 +657,31 @@ namespace FinPulse.UI
             };
         }
 
+        /// <summary>Formats a change that is already calculated (growth views).</summary>
+        private static Delta FromChange(double change, MetricInfo m)
+        {
+            string mag = Math.Abs(change).ToString("0.0", CultureInfo.InvariantCulture) + m.ChangeUnit;
+            if (Math.Abs(change) < 0.05)
+                return new Delta { Text = "— " + mag, Magnitude = mag, Raw = 0, Brush = MutedBrush, Chip = WashBrush };
+
+            bool up = change > 0;
+            bool good = up == m.HigherIsBetter;
+            return new Delta
+            {
+                Text = (up ? "▲ " : "▼ ") + mag,
+                Magnitude = mag,
+                Raw = change,
+                Brush = good ? PositiveBrush : NegativeBrush,
+                Chip = good ? PositiveTint : NegativeTint
+            };
+        }
+
         public static string FormatValue(double value, MetricInfo metric)
         {
+            if (metric.IsChange)
+                return (value > 0 ? "+" : value < 0 ? "−" : "") +
+                       Math.Abs(value).ToString("0.0", CultureInfo.InvariantCulture) + metric.ChangeUnit;
+
             return metric.Kind == ValueKind.Percent
                 ? value.ToString("0.0", CultureInfo.InvariantCulture) + "%"
                 : Math.Round(value, MidpointRounding.AwayFromZero).ToString("N0", CultureInfo.InvariantCulture);

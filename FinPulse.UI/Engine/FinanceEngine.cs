@@ -28,6 +28,8 @@ namespace FinPulse.UI.Engine
         public bool IsCalculated;     // true when "Calculated from" is filled in
         public bool IsStock;          // balance (Loans): a quarter shows its closing month, not a sum
         public bool HigherIsBetter;
+        public bool IsChange;         // a growth view: the numbers are % (or percentage-point) changes, not values
+        public string ChangeUnit;     // "%" or " pp"
     }
 
     /// <summary>Everything read from the workbook, kept free of any Excel types so it can be unit tested.</summary>
@@ -41,6 +43,12 @@ namespace FinPulse.UI.Engine
         public IEnumerable<string> Countries { get { return Rows.Select(r => r.Country).Distinct().OrderBy(s => s); } }
     }
 
+    /// <summary>Draw one series per segment or per country instead of a single combined series.</summary>
+    public enum CompareBy { None, Segment, Country }
+
+    /// <summary>Show the values themselves, or how much they changed.</summary>
+    public enum GrowthView { Value, VsPrevious, VsYearAgo }
+
     public class Query
     {
         public string MetricKey;
@@ -48,6 +56,8 @@ namespace FinPulse.UI.Engine
         public string Country = "All";
         public Frequency Frequency = Frequency.Quarterly;
         public int Periods = 4;
+        public CompareBy CompareBy = CompareBy.None;
+        public GrowthView Growth = GrowthView.Value;
     }
 
     /// <summary>A blank cell that fell inside a displayed period, and what was done about it.</summary>
@@ -68,6 +78,7 @@ namespace FinPulse.UI.Engine
         public string Label;          // "Q2 25" or "Jun 25"
         public string Key;            // "2025Q2" or "2025M06"
         public double? Value;         // null = nothing to show for this period
+        public double? RawValue;      // growth views: the underlying value for this period (Value holds the change)
         public bool IsIncomplete;     // true when the period contains an estimate for a blank cell (or has no figure)
         public bool IsPartial;        // a quarter with fewer than 3 months in the data (quarter to date)
         public string Detail;         // explanation shown in tooltips and the pane
@@ -77,9 +88,12 @@ namespace FinPulse.UI.Engine
     {
         public Query Query;
         public MetricInfo Metric;
+        public MetricInfo BaseMetric;             // growth views: the metric the change was calculated from (null in Value view)
         public List<PeriodPoint> Points = new List<PeriodPoint>();
         public List<DataIssue> Issues = new List<DataIssue>();
         public int RowsUsed;
+        public string SeriesName;                 // used when comparing, for example "Retail"
+        public List<QueryResult> CompareSeries;   // one result per segment or country when comparing, otherwise null
     }
 
     public static class FinanceEngine
@@ -92,7 +106,134 @@ namespace FinPulse.UI.Engine
         // Public API
         // ------------------------------------------------------------------
 
+        public const string OperatingProfitKey = "OperatingProfit";
+
+        /// <summary>
+        /// Runs a query. When q.CompareBy is set, the returned result is the overall series (with the compared
+        /// dimension set to All) and CompareSeries holds one result per segment or country.
+        /// </summary>
         public static QueryResult Run(Dataset data, Query q)
+        {
+            Query overallQuery = Clone(q);
+            if (q.CompareBy == CompareBy.Segment) overallQuery.Segment = "All";
+            if (q.CompareBy == CompareBy.Country) overallQuery.Country = "All";
+
+            QueryResult overall = RunOne(data, overallQuery);
+            overall.SeriesName = "Overall";
+
+            if (q.CompareBy != CompareBy.None)
+            {
+                IEnumerable<string> items = q.CompareBy == CompareBy.Segment ? data.Segments : data.Countries;
+                overall.CompareSeries = new List<QueryResult>();
+                foreach (string item in items.Take(8))      // more than 8 lines is unreadable on a chart
+                {
+                    Query sq = Clone(q);
+                    sq.CompareBy = CompareBy.None;
+                    if (q.CompareBy == CompareBy.Segment) sq.Segment = item; else sq.Country = item;
+
+                    QueryResult one = RunOne(data, sq);
+                    one.SeriesName = item;
+                    if (one.Points.Any(p => p.Value.HasValue)) overall.CompareSeries.Add(one);
+                }
+            }
+            return overall;
+        }
+
+        private static Query Clone(Query q)
+        {
+            return new Query
+            {
+                MetricKey = q.MetricKey,
+                Segment = q.Segment,
+                Country = q.Country,
+                Frequency = q.Frequency,
+                Periods = q.Periods,
+                CompareBy = q.CompareBy,
+                Growth = q.Growth
+            };
+        }
+
+        // ------------------------------------------------------------------
+        // Growth view: % change vs the previous period or the same period last year.
+        // Ratios (cost-to-income) change in percentage points. The first periods, which have nothing to compare
+        // with, are left out. A quarter-to-date total is never compared with a full quarter.
+        // The underlying value of each period is kept in RawValue, so the chart can show it beside the change.
+        // ------------------------------------------------------------------
+
+        private static QueryResult RunOne(Dataset data, Query q)
+        {
+            if (q.Growth == GrowthView.Value) return RunBase(data, q);
+
+            int shift = q.Growth == GrowthView.VsPrevious ? 1 : (q.Frequency == Frequency.Monthly ? 12 : 4);
+            Query bq = Clone(q);
+            bq.Growth = GrowthView.Value;
+            bq.CompareBy = CompareBy.None;
+            bq.Periods = q.Periods + shift;
+            QueryResult b = RunBase(data, bq);
+
+            MetricInfo baseMetric = b.Metric;
+            bool ratio = baseMetric.Kind == ValueKind.Percent;
+            bool flowTotal = baseMetric.Kind == ValueKind.Amount && !baseMetric.IsStock;
+
+            var res = new QueryResult
+            {
+                Query = q,
+                RowsUsed = b.RowsUsed,
+                Metric = new MetricInfo
+                {
+                    Key = baseMetric.Key + "|" + q.Growth,
+                    DisplayName = baseMetric.DisplayName + (q.Growth == GrowthView.VsPrevious
+                        ? ", change vs previous period" : ", change vs same period last year"),
+                    Kind = ValueKind.Percent,
+                    IsCalculated = true,
+                    IsChange = true,
+                    ChangeUnit = ratio ? " pp" : "%",
+                    HigherIsBetter = baseMetric.HigherIsBetter
+                }
+            };
+            res.Issues.AddRange(b.Issues);
+            res.BaseMetric = baseMetric;
+
+            var list = new List<PeriodPoint>();
+            for (int i = shift; i < b.Points.Count; i++)
+            {
+                PeriodPoint cur = b.Points[i], prv = b.Points[i - shift];
+                var p = new PeriodPoint
+                {
+                    Label = cur.Label,
+                    Key = cur.Key,
+                    RawValue = cur.Value,
+                    IsPartial = cur.IsPartial,
+                    IsIncomplete = cur.IsIncomplete || prv.IsIncomplete
+                };
+
+                var notes = new List<string>();
+                if (!string.IsNullOrEmpty(cur.Detail)) notes.Add(cur.Detail);
+                if (!string.IsNullOrEmpty(prv.Detail)) notes.Add("Compared period, " + prv.Label + ": " + prv.Detail);
+
+                if (flowTotal && (cur.IsPartial || prv.IsPartial))
+                {
+                    notes.Add("A quarter to date cannot be compared with a full quarter.");
+                }
+                else if (cur.Value.HasValue && prv.Value.HasValue)
+                {
+                    if (ratio) p.Value = cur.Value.Value - prv.Value.Value;
+                    else if (Math.Abs(prv.Value.Value) > 1e-9) p.Value = (cur.Value.Value - prv.Value.Value) / Math.Abs(prv.Value.Value) * 100.0;
+                }
+
+                p.Detail = notes.Count == 0 ? null : string.Join(" ", notes);
+                list.Add(p);
+            }
+
+            res.Points = list.Skip(Math.Max(0, list.Count - q.Periods)).ToList();
+            return res;
+        }
+
+        // ------------------------------------------------------------------
+        // Values for one series
+        // ------------------------------------------------------------------
+
+        private static QueryResult RunBase(Dataset data, Query q)
         {
             MetricInfo metric = data.Metrics.First(m => m.Key == q.MetricKey);
             var result = new QueryResult { Query = q, Metric = metric };
@@ -103,7 +244,11 @@ namespace FinPulse.UI.Engine
                 (q.Segment == "All" || r.Segment == q.Segment) &&
                 (q.Country == "All" || r.Country == q.Country));
 
-            if (metric.IsCalculated)
+            if (metric.Key == OperatingProfitKey)
+            {
+                RunOperatingProfit(data, scope.ToList(), periods, q.Frequency, result);
+            }
+            else if (metric.IsCalculated)
             {
                 RunCostToIncome(data, scope.ToList(), periods, q.Frequency, result);
             }
@@ -288,6 +433,43 @@ namespace FinPulse.UI.Engine
                 Flag(point, issues, result);
                 result.Points.Add(point);
             }
+        }
+
+        // ------------------------------------------------------------------
+        // Operating profit = revenue minus operating expenses, each with blanks filled in as above.
+        // ------------------------------------------------------------------
+
+        private static void RunOperatingProfit(Dataset data, List<FinancialRow> scope, List<List<int>> periods,
+                                               Frequency freq, QueryResult result)
+        {
+            MetricInfo revMetric = data.Metrics.First(m => m.Key == "Revenue");
+            MetricInfo expMetric = data.Metrics.First(m => m.Key == "Expenses");
+            List<FinancialRow> revRows = scope.Where(r => r.Metric == "Revenue").ToList();
+            List<FinancialRow> expRows = scope.Where(r => r.Metric == "Expenses").ToList();
+            result.RowsUsed = revRows.Count + expRows.Count;
+
+            var rev = new QueryResult { Metric = revMetric };
+            var exp = new QueryResult { Metric = expMetric };
+            RunSimple(data, revRows, periods, freq, revMetric, rev);
+            RunSimple(data, expRows, periods, freq, expMetric, exp);
+
+            for (int i = 0; i < rev.Points.Count; i++)
+            {
+                PeriodPoint a = rev.Points[i], b = exp.Points[i];
+                var p = new PeriodPoint
+                {
+                    Label = a.Label,
+                    Key = a.Key,
+                    IsPartial = a.IsPartial || b.IsPartial,
+                    IsIncomplete = a.IsIncomplete || b.IsIncomplete,
+                    Value = a.Value.HasValue && b.Value.HasValue ? (double?)(a.Value.Value - b.Value.Value) : null
+                };
+                var notes = new[] { a.Detail, b.Detail }.Where(d => !string.IsNullOrEmpty(d)).Distinct().ToList();
+                p.Detail = notes.Count == 0 ? null : string.Join(" ", notes);
+                result.Points.Add(p);
+            }
+            result.Issues.AddRange(rev.Issues);
+            result.Issues.AddRange(exp.Issues);
         }
 
         // ------------------------------------------------------------------

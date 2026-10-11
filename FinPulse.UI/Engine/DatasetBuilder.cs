@@ -28,8 +28,30 @@ namespace FinPulse.UI.Engine
         {
             var data = new Dataset();
             ReadMetrics(metrics, data);
+            AddBuiltInMetrics(data);
             ReadFinancials(financials, data);
             return data;
+        }
+
+        /// <summary>
+        /// Metrics the add-in calculates itself. They are added next to the ones on the Metrics sheet,
+        /// which is never changed.
+        /// </summary>
+        private static void AddBuiltInMetrics(Dataset data)
+        {
+            bool hasRevenue = data.Metrics.Any(m => m.Key.Equals("Revenue", StringComparison.OrdinalIgnoreCase));
+            bool hasExpenses = data.Metrics.Any(m => m.Key.Equals("Expenses", StringComparison.OrdinalIgnoreCase));
+            if (hasRevenue && hasExpenses && !data.Metrics.Any(m => m.Key == FinanceEngine.OperatingProfitKey))
+            {
+                data.Metrics.Add(new MetricInfo
+                {
+                    Key = FinanceEngine.OperatingProfitKey,
+                    DisplayName = "Operating profit",
+                    Kind = ValueKind.Amount,
+                    IsCalculated = true,
+                    HigherIsBetter = true
+                });
+            }
         }
 
         // ------------------------------------------------------------------

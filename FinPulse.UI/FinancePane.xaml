@@ -321,6 +321,23 @@
                         <ComboBox x:Name="MetricCombo" Style="{StaticResource FilterCombo}"
                                   AutomationProperties.Name="Metric" SelectionChanged="Filter_Changed"/>
 
+                        <TextBlock Text="Show" Style="{StaticResource FieldLabel}"/>
+                        <Border Background="{StaticResource Wash}" CornerRadius="8" Padding="2">
+                            <UniformGrid Columns="3">
+                                <RadioButton x:Name="GrowthValue" GroupName="GrowthView" Content="Value"
+                                             IsChecked="True" Checked="Filter_Changed"
+                                             Style="{StaticResource SegmentButton}"/>
+                                <RadioButton x:Name="GrowthPrevious" GroupName="GrowthView" Content="vs previous"
+                                             Checked="Filter_Changed"
+                                             ToolTip="Change since the previous period"
+                                             Style="{StaticResource SegmentButton}"/>
+                                <RadioButton x:Name="GrowthYear" GroupName="GrowthView" Content="vs last year"
+                                             Checked="Filter_Changed"
+                                             ToolTip="Change since the same period a year earlier"
+                                             Style="{StaticResource SegmentButton}"/>
+                            </UniformGrid>
+                        </Border>
+
                         <TextBlock Text="Business segment" Style="{StaticResource FieldLabel}"/>
                         <ComboBox x:Name="SegmentCombo" Style="{StaticResource FilterCombo}"
                                   AutomationProperties.Name="Business segment" SelectionChanged="Filter_Changed"/>
@@ -328,6 +345,23 @@
                         <TextBlock Text="Country" Style="{StaticResource FieldLabel}"/>
                         <ComboBox x:Name="CountryCombo" Style="{StaticResource FilterCombo}"
                                   AutomationProperties.Name="Country" SelectionChanged="Filter_Changed"/>
+
+                        <TextBlock Text="Compare by" Style="{StaticResource FieldLabel}"/>
+                        <Border Background="{StaticResource Wash}" CornerRadius="8" Padding="2">
+                            <UniformGrid Columns="3">
+                                <RadioButton x:Name="CompareNone" GroupName="CompareBy" Content="None"
+                                             IsChecked="True" Checked="Filter_Changed"
+                                             Style="{StaticResource SegmentButton}"/>
+                                <RadioButton x:Name="CompareSegment" GroupName="CompareBy" Content="Segment"
+                                             Checked="Filter_Changed"
+                                             ToolTip="One line or bar per business segment"
+                                             Style="{StaticResource SegmentButton}"/>
+                                <RadioButton x:Name="CompareCountry" GroupName="CompareBy" Content="Country"
+                                             Checked="Filter_Changed"
+                                             ToolTip="One line or bar per country"
+                                             Style="{StaticResource SegmentButton}"/>
+                            </UniformGrid>
+                        </Border>
 
                         <TextBlock Text="Reporting frequency" Style="{StaticResource FieldLabel}"/>
                         <Border Background="{StaticResource Wash}" CornerRadius="8" Padding="2">
@@ -487,12 +521,12 @@
                             </Grid.ColumnDefinitions>
                             <Border Grid.ColumnSpan="3" BorderBrush="{StaticResource Line}"
                                     BorderThickness="0,0,0,1" Margin="0,0,0,0"/>
-                            <TextBlock Text="Period" FontSize="11" FontWeight="SemiBold"
+                            <TextBlock x:Name="PeriodHeader" Text="Period" FontSize="11" FontWeight="SemiBold"
                                        Foreground="{StaticResource Muted}" Margin="6,0,0,7"/>
                             <TextBlock x:Name="ValueHeader" Grid.Column="1" Text="Value" FontSize="11"
                                        FontWeight="SemiBold" Foreground="{StaticResource Muted}"
                                        HorizontalAlignment="Right" Margin="0,0,0,7"/>
-                            <TextBlock Grid.Column="2" Text="Change" FontSize="11" FontWeight="SemiBold"
+                            <TextBlock x:Name="ChangeHeader" Grid.Column="2" Text="Change" FontSize="11" FontWeight="SemiBold"
                                        Foreground="{StaticResource Muted}" HorizontalAlignment="Right"
                                        Margin="0,0,6,7"/>
                         </Grid>
