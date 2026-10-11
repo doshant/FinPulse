@@ -1,51 +1,526 @@
 ﻿<UserControl x:Class="FinPulse.UI.FinancePane"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             MinWidth="280"
-             Background="#F5F7FB">
+             MinWidth="300"
+             Background="#EEF2F8"
+             FontFamily="Segoe UI"
+             UseLayoutRounding="True"
+             SnapsToDevicePixels="True"
+             TextOptions.TextFormattingMode="Display">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="18">
-            <TextBlock Text="FINANCE EXPLORER"
-                       FontSize="12"
-                       FontWeight="Bold"
-                       Foreground="#52709A"/>
+    <UserControl.Resources>
 
-            <TextBlock Text="Financial performance"
-                       FontSize="23"
-                       FontWeight="SemiBold"
-                       Foreground="#172B4D"
-                       Margin="0,8,0,4"/>
+        <!-- ============ Palette ============ -->
+        <SolidColorBrush x:Key="Navy" Color="#0F2A4A"/>
+        <SolidColorBrush x:Key="NavyDeep" Color="#0A1F38"/>
+        <SolidColorBrush x:Key="Accent" Color="#2563EB"/>
+        <SolidColorBrush x:Key="AccentHover" Color="#1D4FD0"/>
+        <SolidColorBrush x:Key="AccentPressed" Color="#173FA8"/>
+        <SolidColorBrush x:Key="Ink" Color="#16243A"/>
+        <SolidColorBrush x:Key="Muted" Color="#64748B"/>
+        <SolidColorBrush x:Key="Line" Color="#E2E8F0"/>
+        <SolidColorBrush x:Key="Field" Color="#CBD5E1"/>
+        <SolidColorBrush x:Key="Surface" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="Wash" Color="#EDF1F7"/>
+        <SolidColorBrush x:Key="Positive" Color="#0F7B53"/>
+        <SolidColorBrush x:Key="Negative" Color="#C23B3B"/>
 
-            <TextBlock
-                Text="Explore your bank's monthly and quarterly results."
-                TextWrapping="Wrap"
-                Foreground="#667085"
-                Margin="0,0,0,20"/>
+        <!-- ============ Shadows ============ -->
+        <DropShadowEffect x:Key="CardShadow" BlurRadius="16" ShadowDepth="2" Direction="270"
+                          Opacity="0.10" Color="#0F2A4A"/>
+        <DropShadowEffect x:Key="SoftShadow" BlurRadius="6" ShadowDepth="1" Direction="270"
+                          Opacity="0.14" Color="#0F2A4A"/>
+        <DropShadowEffect x:Key="PopupShadow" BlurRadius="14" ShadowDepth="3" Direction="270"
+                          Opacity="0.18" Color="#0F2A4A"/>
 
-            <Border Background="White"
-                    CornerRadius="10"
-                    Padding="14"
-                    BorderBrush="#E1E7F0"
-                    BorderThickness="1">
-                <StackPanel>
-                    <TextBlock Text="DASHBOARD STATUS"
-                               FontSize="11"
-                               FontWeight="Bold"
-                               Foreground="#667085"/>
+        <!-- ============ Text ============ -->
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource Muted}"/>
+            <Setter Property="Margin" Value="0,14,0,6"/>
+        </Style>
 
-                    <TextBlock Text="Your workspace is ready."
-                               FontSize="16"
-                               FontWeight="SemiBold"
-                               Foreground="#172B4D"
-                               Margin="0,8,0,4"/>
+        <Style x:Key="CardTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource Navy}"/>
+        </Style>
 
-                    <TextBlock
-                        Text="Next, we'll connect the financial data and interactive filters."
-                        TextWrapping="Wrap"
-                        Foreground="#667085"/>
-                </StackPanel>
+        <!-- ============ Card ============ -->
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource Surface}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="16"/>
+            <Setter Property="Effect" Value="{StaticResource CardShadow}"/>
+        </Style>
+
+        <!-- ============ ComboBox ============ -->
+        <Style x:Key="FilterComboItem" TargetType="ComboBoxItem">
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Foreground" Value="{StaticResource Ink}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="6"
+                                Margin="4,1" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#EEF3FA"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#E3ECFF"/>
+                                <Setter Property="Foreground" Value="{StaticResource Navy}"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="FilterCombo" TargetType="ComboBox">
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Foreground" Value="{StaticResource Ink}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="ItemContainerStyle" Value="{StaticResource FilterComboItem}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="Toggle" Focusable="False" ClickMode="Press"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="Bd" Background="White"
+                                                BorderBrush="{StaticResource Field}"
+                                                BorderThickness="1" CornerRadius="8">
+                                            <Path Data="M0,0 L4,4 L8,0"
+                                                  Stroke="{StaticResource Muted}" StrokeThickness="1.6"
+                                                  StrokeLineJoin="Round"
+                                                  HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                  Margin="0,0,13,0"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Accent}"/>
+                                            </Trigger>
+                                            <Trigger Property="IsChecked" Value="True">
+                                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Accent}"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+
+                            <ContentPresenter IsHitTestVisible="False"
+                                              Margin="12,0,32,0"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Left"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"/>
+
+                            <Popup x:Name="PART_Popup"
+                                   Placement="Bottom"
+                                   HorizontalOffset="-8"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   PopupAnimation="Fade">
+                                <Grid Margin="8,2,8,16">
+                                    <Border Width="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                            MaxHeight="{TemplateBinding MaxDropDownHeight}"
+                                            Background="White"
+                                            BorderBrush="{StaticResource Line}"
+                                            BorderThickness="1"
+                                            CornerRadius="8"
+                                            Padding="0,4"
+                                            Effect="{StaticResource PopupShadow}">
+                                        <ScrollViewer>
+                                            <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/>
+                                        </ScrollViewer>
+                                    </Border>
+                                </Grid>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.55"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ============ Segmented control ============ -->
+        <Style x:Key="SegmentButton" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{StaticResource Muted}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="6"
+                                Padding="0,7" Margin="1">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#E0E7F2"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="White"/>
+                                <Setter TargetName="Bd" Property="Effect" Value="{StaticResource SoftShadow}"/>
+                                <Setter Property="Foreground" Value="{StaticResource Navy}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ============ Buttons ============ -->
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{StaticResource Accent}" CornerRadius="8"
+                                Effect="{StaticResource SoftShadow}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentHover}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentPressed}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Background" Value="#94A3B8"/>
+                                <Setter TargetName="Bd" Property="Effect" Value="{x:Null}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="LinkButton" TargetType="Button">
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource Accent}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="5" Padding="7,3">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#E8EFFD"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ============ Result row ============ -->
+        <DataTemplate x:Key="ResultRowTemplate">
+            <Border x:Name="RowBd" BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1"
+                    Padding="6,9" CornerRadius="4">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.1*"/>
+                        <ColumnDefinition Width="1.2*"/>
+                        <ColumnDefinition Width="0.9*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal" ToolTip="{Binding Detail}">
+                        <TextBlock Text="{Binding Period}" FontSize="12" Foreground="{StaticResource Ink}"/>
+                        <TextBlock Text=" ●" FontSize="9" Foreground="#E0A100" VerticalAlignment="Center"
+                                   Visibility="{Binding FlagVisibility}"/>
+                    </StackPanel>
+                    <TextBlock Grid.Column="1" Text="{Binding ValueText}" FontSize="12" FontWeight="SemiBold"
+                               Foreground="{StaticResource Navy}" HorizontalAlignment="Right"/>
+                    <TextBlock Grid.Column="2" Text="{Binding ChangeText}" FontSize="11.5" FontWeight="SemiBold"
+                               Foreground="{Binding ChangeBrush}" HorizontalAlignment="Right"/>
+                </Grid>
             </Border>
-        </StackPanel>
-    </ScrollViewer>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsLatest}" Value="True">
+                    <Setter TargetName="RowBd" Property="Background" Value="#F1F6FF"/>
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- ================= Brand bar (stays pinned) ================= -->
+        <Border Grid.Row="0" Background="{StaticResource Navy}"
+                BorderBrush="{StaticResource Accent}" BorderThickness="0,0,0,2"
+                Padding="16,13">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Width="32" Height="32" CornerRadius="8" Background="{StaticResource Accent}">
+                    <TextBlock Text="F" FontSize="19" FontWeight="Bold" Foreground="White"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+
+                <StackPanel Grid.Column="1" Margin="11,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="FinPulse" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                    <TextBlock Text="Financial explorer" FontSize="11" Foreground="#9FB3CF" Margin="0,1,0,0"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ================= Scrolling content ================= -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="16,18,16,16">
+
+                <TextBlock Text="Explore performance" FontSize="21" FontWeight="SemiBold"
+                           Foreground="{StaticResource Navy}" TextWrapping="Wrap"/>
+                <TextBlock Text="Choose what to look at. The numbers and the Excel chart update straight away."
+                           FontSize="12" Foreground="{StaticResource Muted}"
+                           TextWrapping="Wrap" Margin="0,4,0,16"/>
+
+                <!-- ============ Settings ============ -->
+                <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                    <StackPanel>
+                        <TextBlock Text="Analysis settings" Style="{StaticResource CardTitle}"/>
+
+                        <TextBlock Text="Metric" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox x:Name="MetricCombo" Style="{StaticResource FilterCombo}"
+                                  AutomationProperties.Name="Metric" SelectionChanged="Filter_Changed"/>
+
+                        <TextBlock Text="Business segment" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox x:Name="SegmentCombo" Style="{StaticResource FilterCombo}"
+                                  AutomationProperties.Name="Business segment" SelectionChanged="Filter_Changed"/>
+
+                        <TextBlock Text="Country" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox x:Name="CountryCombo" Style="{StaticResource FilterCombo}"
+                                  AutomationProperties.Name="Country" SelectionChanged="Filter_Changed"/>
+
+                        <TextBlock Text="Reporting frequency" Style="{StaticResource FieldLabel}"/>
+                        <Border Background="{StaticResource Wash}" CornerRadius="8" Padding="2">
+                            <UniformGrid Columns="2">
+                                <RadioButton x:Name="MonthlyOption" GroupName="Frequency"
+                                             Content="Monthly" Checked="Filter_Changed" Style="{StaticResource SegmentButton}"/>
+                                <RadioButton x:Name="QuarterlyOption" GroupName="Frequency"
+                                             Content="Quarterly" IsChecked="True" Checked="Filter_Changed"
+                                             Style="{StaticResource SegmentButton}"/>
+                            </UniformGrid>
+                        </Border>
+
+                        <TextBlock Text="Number of periods" Style="{StaticResource FieldLabel}"/>
+                        <Border Background="{StaticResource Wash}" CornerRadius="8" Padding="2">
+                            <UniformGrid x:Name="PeriodsHost" Columns="5">
+                                <RadioButton GroupName="Periods" Content="3" Tag="3" Checked="Filter_Changed"
+                                             Style="{StaticResource SegmentButton}"/>
+                                <RadioButton GroupName="Periods" Content="4" Tag="4" Checked="Filter_Changed"
+                                             Style="{StaticResource SegmentButton}"/>
+                                <RadioButton GroupName="Periods" Content="6" Tag="6" IsChecked="True" Checked="Filter_Changed"
+                                             Style="{StaticResource SegmentButton}"/>
+                                <RadioButton GroupName="Periods" Content="12" Tag="12" Checked="Filter_Changed"
+                                             Style="{StaticResource SegmentButton}"/>
+                                <RadioButton GroupName="Periods" Content="All" Tag="0" Checked="Filter_Changed"
+                                             Style="{StaticResource SegmentButton}"/>
+                            </UniformGrid>
+                        </Border>
+
+                        <TextBlock Text="Chart type" Style="{StaticResource FieldLabel}"/>
+                        <Border Background="{StaticResource Wash}" CornerRadius="8" Padding="2">
+                            <UniformGrid Columns="2">
+                                <RadioButton x:Name="ColumnOption" GroupName="ChartType" Content="Column"
+                                             IsChecked="True" Checked="ChartType_Changed"
+                                             Style="{StaticResource SegmentButton}"/>
+                                <RadioButton x:Name="LineOption" GroupName="ChartType" Content="Line"
+                                             Checked="ChartType_Changed"
+                                             Style="{StaticResource SegmentButton}"/>
+                            </UniformGrid>
+                        </Border>
+
+                        <TextBlock Text="Order of periods" Style="{StaticResource FieldLabel}"/>
+                        <Border Background="{StaticResource Wash}" CornerRadius="8" Padding="2">
+                            <UniformGrid Columns="2">
+                                <RadioButton x:Name="NewestOption" GroupName="PeriodOrder" Content="Newest first"
+                                             IsChecked="True" Checked="ChartType_Changed"
+                                             Style="{StaticResource SegmentButton}"/>
+                                <RadioButton x:Name="OldestOption" GroupName="PeriodOrder" Content="Oldest first"
+                                             Checked="ChartType_Changed"
+                                             Style="{StaticResource SegmentButton}"/>
+                            </UniformGrid>
+                        </Border>
+
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="StatusText" Text="The chart on the Dashboard sheet updates as you choose."
+                                       FontSize="11" Foreground="{StaticResource Muted}"
+                                       TextWrapping="Wrap" VerticalAlignment="Center"/>
+                            <Button x:Name="ResetButton" Grid.Column="1" Content="Reset"
+                                    Style="{StaticResource LinkButton}" Margin="8,0,-7,0"
+                                    Click="ResetButton_Click"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- ============ Snapshot ============ -->
+                <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="KpiLabel" Text="Latest period value"
+                                       FontSize="11.5" FontWeight="SemiBold"
+                                       Foreground="{StaticResource Muted}"
+                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                            <Border x:Name="SourceBadge" Grid.Column="1" Visibility="Collapsed"
+                                    Background="#FFF4DB" CornerRadius="9" Padding="8,2" Margin="8,0,0,0">
+                                <TextBlock x:Name="SourceBadgeText" FontSize="10.5" FontWeight="SemiBold"
+                                           Foreground="#8A5A00"/>
+                            </Border>
+                        </Grid>
+
+                        <TextBlock Margin="0,8,0,0">
+                            <Run x:Name="KpiValueRun" Text="—" FontSize="28" FontWeight="Bold"
+                                 Foreground="{StaticResource Navy}"/>
+                            <Run x:Name="KpiUnitRun" Text="" FontSize="12" FontWeight="SemiBold"
+                                 Foreground="{StaticResource Muted}"/>
+                        </TextBlock>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <Border x:Name="ChangeChip" Background="{StaticResource Wash}"
+                                    CornerRadius="10" Padding="9,3">
+                                <TextBlock x:Name="ChangeChipText" Text="No data yet" FontSize="11"
+                                           FontWeight="SemiBold" Foreground="{StaticResource Muted}"/>
+                            </Border>
+                            <TextBlock x:Name="ChangeCaption" Text="vs previous period" FontSize="11"
+                                       Foreground="{StaticResource Muted}" VerticalAlignment="Center"
+                                       Margin="8,0,0,0" Visibility="Collapsed"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="YoyText" FontSize="11" Foreground="{StaticResource Muted}"
+                                   TextWrapping="Wrap" Margin="0,8,0,0" Visibility="Collapsed"/>
+
+                        <Polyline x:Name="Sparkline" Height="42" Stretch="Fill"
+                                  Stroke="{StaticResource Accent}" StrokeThickness="2"
+                                  StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                  Margin="0,16,0,0" Visibility="Collapsed"/>
+
+                        <TextBlock x:Name="KpiHint"
+                                   Text="Your latest value and period-over-period change will appear here."
+                                   FontSize="11" Foreground="{StaticResource Muted}"
+                                   TextWrapping="Wrap" Margin="0,12,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- ============ Data quality ============ -->
+                <Border x:Name="QualityBox" Visibility="Collapsed" Margin="0,0,0,14" Padding="14,12"
+                        Background="#FFF7E6" BorderBrush="#F3D9A4" BorderThickness="1" CornerRadius="10">
+                    <StackPanel>
+                        <TextBlock Text="Some figures are estimated" FontSize="12" FontWeight="SemiBold"
+                                   Foreground="#7A4B00"/>
+                        <TextBlock x:Name="QualityText" FontSize="11" Foreground="#7A4B00"
+                                   TextWrapping="Wrap" Margin="0,5,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- ============ Results ============ -->
+                <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Results" Style="{StaticResource CardTitle}" VerticalAlignment="Center"/>
+                            <Button x:Name="CopyButton" Grid.Column="1" Content="Copy table"
+                                    Style="{StaticResource LinkButton}" Margin="0,-3,-7,-3"
+                                    IsEnabled="False" Click="CopyButton_Click"
+                                    ToolTip="Copy the table so you can paste it into Excel"/>
+                        </Grid>
+
+                        <Grid x:Name="ResultsHeader" Margin="0,12,0,0" Visibility="Collapsed">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1.1*"/>
+                                <ColumnDefinition Width="1.2*"/>
+                                <ColumnDefinition Width="0.9*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.ColumnSpan="3" BorderBrush="{StaticResource Line}"
+                                    BorderThickness="0,0,0,1" Margin="0,0,0,0"/>
+                            <TextBlock Text="Period" FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{StaticResource Muted}" Margin="6,0,0,7"/>
+                            <TextBlock x:Name="ValueHeader" Grid.Column="1" Text="Value" FontSize="11"
+                                       FontWeight="SemiBold" Foreground="{StaticResource Muted}"
+                                       HorizontalAlignment="Right" Margin="0,0,0,7"/>
+                            <TextBlock Grid.Column="2" Text="Change" FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{StaticResource Muted}" HorizontalAlignment="Right"
+                                       Margin="0,0,6,7"/>
+                        </Grid>
+
+                        <ItemsControl x:Name="ResultsList" ItemTemplate="{StaticResource ResultRowTemplate}"
+                                      Focusable="False"/>
+
+                        <TextBlock x:Name="EmptyResults"
+                                   Text="No results to show for these settings."
+                                   FontSize="11.5" Foreground="{StaticResource Muted}"
+                                   TextWrapping="Wrap" Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- ============ Insights ============ -->
+                <Border Background="{StaticResource Navy}" CornerRadius="12" Padding="16"
+                        Effect="{StaticResource CardShadow}">
+                    <StackPanel>
+                        <TextBlock Text="Key takeaways" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
+                        <TextBlock x:Name="InsightText"
+                                   Text="Run an analysis to see how the metric moved and which period changed the most."
+                                   FontSize="12" Foreground="#CFE0FA" TextWrapping="Wrap"
+                                   LineHeight="18" Margin="0,8,0,0"/>
+                        <Border x:Name="InsightNoteBox" Visibility="Collapsed" Margin="0,12,0,0"
+                                BorderBrush="#2A4A73" BorderThickness="0,1,0,0" Padding="0,10,0,0">
+                            <TextBlock x:Name="InsightNote" FontSize="11" Foreground="#9FB3CF"
+                                       TextWrapping="Wrap"/>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Text="FinPulse financial analytics" FontSize="10.5"
+                           Foreground="#98A5B8" HorizontalAlignment="Center" Margin="0,18,0,4"/>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
 </UserControl>
