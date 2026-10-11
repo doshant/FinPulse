@@ -388,9 +388,15 @@
                             <TextBlock x:Name="StatusText" Text="The chart on the Dashboard sheet updates as you choose."
                                        FontSize="11" Foreground="{StaticResource Muted}"
                                        TextWrapping="Wrap" VerticalAlignment="Center"/>
-                            <Button x:Name="ResetButton" Grid.Column="1" Content="Reset"
-                                    Style="{StaticResource LinkButton}" Margin="8,0,-7,0"
-                                    Click="ResetButton_Click"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="8,0,-7,0">
+                                <Button x:Name="RefreshButton" Content="Refresh data"
+                                        Style="{StaticResource LinkButton}"
+                                        ToolTip="Re-read the Financials and Metrics sheets, for example after adding a new month"
+                                        Click="RefreshButton_Click"/>
+                                <Button x:Name="ResetButton" Content="Reset"
+                                        Style="{StaticResource LinkButton}"
+                                        Click="ResetButton_Click"/>
+                            </StackPanel>
                         </Grid>
                     </StackPanel>
                 </Border>

@@ -203,6 +203,9 @@
       <AutoGen>True</AutoGen>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
+    <EmbeddedResource Include="RibbonToggle.resx">
+      <DependentUpon>RibbonToggle.cs</DependentUpon>
+    </EmbeddedResource>
     <None Include="FinPulse_TemporaryKey.pfx" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>

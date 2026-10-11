@@ -69,6 +69,7 @@ namespace FinPulse.UI.Engine
         public string Key;            // "2025Q2" or "2025M06"
         public double? Value;         // null = nothing to show for this period
         public bool IsIncomplete;     // true when the period contains an estimate for a blank cell (or has no figure)
+        public bool IsPartial;        // a quarter with fewer than 3 months in the data (quarter to date)
         public string Detail;         // explanation shown in tooltips and the pane
     }
 
@@ -341,11 +342,24 @@ namespace FinPulse.UI.Engine
         private static PeriodPoint NewPoint(Dataset data, List<int> months, Frequency freq)
         {
             string first = data.Months[months[0]];
-            return new PeriodPoint
+            var point = new PeriodPoint
             {
                 Label = PeriodLabel(first, freq),
                 Key = freq == Frequency.Quarterly ? QuarterKey(first) : first
             };
+
+            // New months arrive over time, so the newest quarter is often only partly there (for example only July).
+            // It is still shown, but marked, so a one-month total is never mistaken for a full quarter.
+            if (freq == Frequency.Quarterly && months.Count < 3)
+            {
+                point.IsPartial = true;
+                point.IsIncomplete = true;
+                string span = months.Count == 1
+                    ? MonthText(data.Months[months[0]])
+                    : MonthText(data.Months[months[0]]) + " to " + MonthText(data.Months[months[months.Count - 1]]);
+                point.Detail = "Quarter to date: only " + span + " (" + months.Count + " of 3 months) is in the data.";
+            }
+            return point;
         }
 
         private static void Flag(PeriodPoint point, List<DataIssue> issues, QueryResult result)
@@ -360,7 +374,8 @@ namespace FinPulse.UI.Engine
                                  : " has no figure (" + i.Method + ")") +
                              (string.IsNullOrWhiteSpace(i.Note) ? string.Empty : " [" + i.Note.Trim() + "]"))
                 .Distinct().Take(3).ToList();
-            point.Detail = "Estimated: " + string.Join("; ", parts) + (issues.Count > 3 ? "; and more." : ".");
+            string estimated = "Estimated: " + string.Join("; ", parts) + (issues.Count > 3 ? "; and more." : ".");
+            point.Detail = string.IsNullOrEmpty(point.Detail) ? estimated : point.Detail + " " + estimated;
 
             result.Issues.AddRange(issues);
         }

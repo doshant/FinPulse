@@ -43,6 +43,9 @@ namespace FinPulse.UI
         /// <summary>Raised whenever the numbers change. The add-in draws the Excel chart from this.</summary>
         public event EventHandler<QueryResult> ResultChanged;
 
+        /// <summary>Raised when the user asks to re-read the sheets (for example after adding a month).</summary>
+        public event EventHandler RefreshRequested;
+
         public FinancePane()
         {
             InitializeComponent();
@@ -102,6 +105,12 @@ namespace FinPulse.UI
         private void Filter_Changed(object sender, RoutedEventArgs e) { Refresh(); }
 
         private void ChartType_Changed(object sender, RoutedEventArgs e) { Refresh(); }
+
+        private void RefreshButton_Click(object sender, RoutedEventArgs e)
+        {
+            EventHandler handler = RefreshRequested;
+            if (handler != null) handler(this, EventArgs.Empty);
+        }
 
         private void ResetButton_Click(object sender, RoutedEventArgs e)
         {
@@ -219,7 +228,13 @@ namespace FinPulse.UI
             KpiUnitRun.Text = percent || !latest.Value.HasValue ? string.Empty : "  USD thousands";
 
             Delta d;
-            if (previous != null && latest.Value.HasValue && previous.Value.HasValue)
+            if (previous != null && latest.Value.HasValue && previous.Value.HasValue && NotComparable(latest, previous, metric))
+            {
+                d = new Delta { Text = "Not comparable", Brush = MutedBrush, Chip = WashBrush };
+                ChangeCaption.Text = "quarter to date vs a full quarter";
+                ChangeCaption.Visibility = Visibility.Visible;
+            }
+            else if (previous != null && latest.Value.HasValue && previous.Value.HasValue)
             {
                 d = ComputeDelta(latest.Value.Value, previous.Value.Value, metric);
                 ChangeCaption.Text = "vs " + previous.Label;
@@ -234,7 +249,7 @@ namespace FinPulse.UI
             ChangeChipText.Text = d.Text;
             ChangeChipText.Foreground = d.Brush;
 
-            if (yearAgo.HasValue && latest.Value.HasValue)
+            if (yearAgo.HasValue && latest.Value.HasValue && !(latest.IsPartial && IsFlowTotal(metric)))
             {
                 Delta y = ComputeDelta(latest.Value.Value, yearAgo.Value, metric);
                 YoyText.Text = "Same period last year: " + FormatValue(yearAgo.Value, metric) + "  (" + y.Text + ")";
@@ -247,7 +262,9 @@ namespace FinPulse.UI
 
             DrawSparkline(NewestFirst ? Enumerable.Reverse(pts).ToList() : pts);
             KpiHint.Text = latest.Value.HasValue
-                ? "Latest period: " + latest.Label + (latest.IsIncomplete ? ". Includes estimated figures." : ".")
+                ? "Latest period: " + latest.Label +
+                  (latest.IsPartial ? ". Quarter to date, not a full quarter."
+                                    : latest.IsIncomplete ? ". Includes estimated figures." : ".")
                 : latest.Label + " has no figure yet. " + (latest.Detail ?? string.Empty);
 
             SourceBadge.Visibility = Visibility.Collapsed;
@@ -269,7 +286,11 @@ namespace FinPulse.UI
                     ChangeText = "—",
                     ChangeBrush = MutedBrush
                 };
-                if (i > 0 && p.Value.HasValue && pts[i - 1].Value.HasValue)
+                if (i > 0 && p.Value.HasValue && pts[i - 1].Value.HasValue && NotComparable(p, pts[i - 1], metric))
+                {
+                    row.ChangeText = "n/c";
+                }
+                else if (i > 0 && p.Value.HasValue && pts[i - 1].Value.HasValue)
                 {
                     Delta dd = ComputeDelta(p.Value.Value, pts[i - 1].Value.Value, metric);
                     row.ChangeText = dd.Text;
@@ -382,8 +403,10 @@ namespace FinPulse.UI
         private static string BuildInsight(QueryResult result)
         {
             MetricInfo metric = result.Metric;
-            var have = result.Points.Where(p => p.Value.HasValue).ToList();
-            if (have.Count < 2) return "There are not enough figures in this view to describe a trend.";
+            var have = result.Points
+                .Where(p => p.Value.HasValue && !(p.IsPartial && IsFlowTotal(metric)))   // a part-quarter total is not a trend point
+                .ToList();
+            if (have.Count < 2) return "There are not enough comparable figures in this view to describe a trend.";
 
             string unitWord = result.Query.Frequency == Frequency.Quarterly ? "quarters" : "months";
             PeriodPoint first = have[0], last = have[have.Count - 1];
@@ -416,6 +439,18 @@ namespace FinPulse.UI
         // Helpers
         // ------------------------------------------------------------------
 
+        /// <summary>Revenue and expenses add up over a period. Loans and ratios do not.</summary>
+        private static bool IsFlowTotal(MetricInfo metric)
+        {
+            return metric.Kind == ValueKind.Amount && !metric.IsStock;
+        }
+
+        /// <summary>A part-quarter total of a flow cannot be fairly compared with a full quarter.</summary>
+        private static bool NotComparable(PeriodPoint a, PeriodPoint b, MetricInfo metric)
+        {
+            return IsFlowTotal(metric) && (a.IsPartial || b.IsPartial);
+        }
+
         private static string ScopeText(Query q)
         {
             string seg = q.Segment == "All" ? "all segments" : q.Segment;
@@ -440,7 +475,7 @@ namespace FinPulse.UI
 
         private struct Delta
         {
-            public string Text;       
+            public string Text;        // "▲ 2.4%"
             public string Magnitude;   // "2.4%"
             public double Raw;         // signed change in percent, or percentage points for ratios
             public Brush Brush;

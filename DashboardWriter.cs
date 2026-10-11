@@ -34,10 +34,10 @@ namespace FinPulse
 
         /// <param name="newestFirst">Latest period first (the default) or oldest first.</param>
         /// <param name="activate">Bring the Dashboard sheet to the front, so the chart is the first thing seen.</param>
-        public void Write(Excel.Workbook wb, QueryResult result, bool lineChart, bool newestFirst, bool activate)
+        public bool Write(Excel.Workbook wb, QueryResult result, bool lineChart, bool newestFirst, bool activate)
         {
             Excel.Worksheet ws = FindSheet(wb, SheetName);
-            if (ws == null) return;
+            if (ws == null) return false;
 
             Excel.Application app = ws.Application;
             bool oldUpdating = app.ScreenUpdating;
@@ -59,7 +59,7 @@ namespace FinPulse
                 // Earlier versions put the table in A:C. Remove it once so it does not sit under the chart.
                 if (Convert.ToString(ws.Range["A" + HeaderRow].Value2) == "Period")
                     ws.Range["A1:C80"].Clear();
-                ws.Range[ColA + "1:" + ColC + "80"].Clear();      // also resets old highlights and wrapping
+                ws.Range[ColA + "1:" + ColC + "500"].Clear();      // also resets old highlights and wrapping
 
                 ws.Range[ColA + "1"].Value2 = result.Metric.DisplayName + ", " + Scope(result.Query);
                 ws.Range[ColA + "1"].Font.Bold = true;
@@ -208,7 +208,7 @@ namespace FinPulse
                 if (result.Points.Any(p => p.IsIncomplete))
                 {
                     int noteRow = last + 2;
-                    ws.Range[ColA + noteRow].Value2 = "Amber = includes an estimate for a blank input. Loans repeat the previous month; revenue and expenses use the average of the months either side.";
+                    ws.Range[ColA + noteRow].Value2 = "Amber = quarter to date, or includes an estimate for a blank input. Loans repeat the previous month; revenue and expenses use the average of the months either side.";
                     ws.Range[ColA + noteRow].Font.Italic = true;
                     ws.Range[ColA + noteRow].Font.Color = Muted;
                 }
@@ -224,6 +224,7 @@ namespace FinPulse
             {
                 app.ScreenUpdating = oldUpdating;
             }
+            return true;
         }
 
         private static string Scope(Query q)

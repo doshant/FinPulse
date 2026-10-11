@@ -13,12 +13,13 @@ namespace FinPulse
         private FinancePane _pane;
         private CustomTaskPane _taskPane;
         private bool _started;
-        private bool _showDashboardNext;    
+        private bool _showDashboardNext;     // true right after Launch, so the chart is the first thing the user sees
         private readonly DashboardWriter _dashboard = new DashboardWriter();
+        private System.Windows.Forms.Timer _reloadTimer;     // waits for edits to settle before re-reading the sheets
 
         private void ThisAddIn_Startup(object sender, EventArgs e)
         {
-       
+            // Nothing starts automatically. The user clicks the ribbon "Launch FinPulse" button.
             _started = false;
         }
 
@@ -72,12 +73,44 @@ namespace FinPulse
             {
                 bool activate = _showDashboardNext;
                 _showDashboardNext = false;
-                _dashboard.Write(wb, result, _pane.UseLineChart, _pane.NewestFirst, activate);
+                if (!_dashboard.Write(wb, result, _pane.UseLineChart, _pane.NewestFirst, activate))
+                    _pane.ShowStatus("This workbook has no sheet named Dashboard, so there is nowhere to draw the chart.", true);
             }
             catch (Exception ex)
             {
                 _pane.ShowStatus("Couldn't update the Dashboard chart. " + ex.Message, true);
             }
+        }
+
+        /// <summary>
+        /// Fires on every cell edit. Only edits on the Financials or Metrics sheets matter. A short delay groups a
+        /// paste of many cells into one reload.
+        /// </summary>
+        private void Application_SheetChange(object sh, Excel.Range target)
+        {
+            Excel.Worksheet ws = sh as Excel.Worksheet;
+            if (ws == null) return;
+            if (!string.Equals(ws.Name, "Financials", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(ws.Name, "Metrics", StringComparison.OrdinalIgnoreCase)) return;
+
+            if (_reloadTimer == null)
+            {
+                _reloadTimer = new System.Windows.Forms.Timer { Interval = 500 };
+                _reloadTimer.Tick += delegate
+                {
+                    _reloadTimer.Stop();
+                    Excel.Workbook wb = Application.ActiveWorkbook;
+                    if (wb != null) LoadFrom(wb);
+                };
+            }
+            _reloadTimer.Stop();
+            _reloadTimer.Start();
+        }
+
+        private void Pane_RefreshRequested(object sender, EventArgs e)
+        {
+            Excel.Workbook wb = Application.ActiveWorkbook;
+            if (wb != null) LoadFrom(wb);
         }
 
         #region VSTO generated code
@@ -125,6 +158,7 @@ namespace FinPulse
             }
         }
 
+        /// <summary>Ensure the FinPulse custom task pane exists and is visible.</summary>
         public void ShowTaskPane()
         {
             try
@@ -150,7 +184,7 @@ namespace FinPulse
                 _taskPane.Width = 380;
                 _taskPane.Visible = true;
 
-               
+                // If showing failed, recreate as a last resort
                 if (!_taskPane.Visible)
                 {
                     var old = _taskPane;
@@ -209,8 +243,9 @@ namespace FinPulse
 
                 Application.WorkbookActivate += Application_WorkbookActivate;
                 Application.WorkbookOpen += Application_WorkbookActivate;
+                Application.SheetChange += Application_SheetChange;       // new months typed or pasted in show up by themselves
 
-                _showDashboardNext = true;       
+                _showDashboardNext = true;       // after loading, jump to the Dashboard sheet so the chart is seen first
                 if (Application.ActiveWorkbook != null) LoadFrom(Application.ActiveWorkbook);
 
                 _started = true;
@@ -227,6 +262,7 @@ namespace FinPulse
             {
                 _pane = new FinancePane();
                 _pane.ResultChanged += Pane_ResultChanged;
+                _pane.RefreshRequested += Pane_RefreshRequested;
             }
 
             var host = new ElementHost { Dock = DockStyle.Fill, Child = _pane };
