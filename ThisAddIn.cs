@@ -13,12 +13,12 @@ namespace FinPulse
         private FinancePane _pane;
         private CustomTaskPane _taskPane;
         private bool _started;
-        private bool _showDashboardNext;     // true right after Launch, so the chart is the first thing the user sees
+        private bool _showDashboardNext;    
         private readonly DashboardWriter _dashboard = new DashboardWriter();
 
         private void ThisAddIn_Startup(object sender, EventArgs e)
         {
-            // Nothing starts automatically. The user clicks the ribbon "Launch FinPulse" button.
+       
             _started = false;
         }
 
@@ -125,7 +125,6 @@ namespace FinPulse
             }
         }
 
-        /// <summary>Ensure the FinPulse custom task pane exists and is visible.</summary>
         public void ShowTaskPane()
         {
             try
@@ -151,7 +150,7 @@ namespace FinPulse
                 _taskPane.Width = 380;
                 _taskPane.Visible = true;
 
-                // If showing failed, recreate as a last resort
+               
                 if (!_taskPane.Visible)
                 {
                     var old = _taskPane;
@@ -211,7 +210,7 @@ namespace FinPulse
                 Application.WorkbookActivate += Application_WorkbookActivate;
                 Application.WorkbookOpen += Application_WorkbookActivate;
 
-                _showDashboardNext = true;       // after loading, jump to the Dashboard sheet so the chart is seen first
+                _showDashboardNext = true;       
                 if (Application.ActiveWorkbook != null) LoadFrom(Application.ActiveWorkbook);
 
                 _started = true;

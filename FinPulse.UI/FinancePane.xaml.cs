@@ -440,7 +440,7 @@ namespace FinPulse.UI
 
         private struct Delta
         {
-            public string Text;        // "▲ 2.4%"
+            public string Text;       
             public string Magnitude;   // "2.4%"
             public double Raw;         // signed change in percent, or percentage points for ratios
             public Brush Brush;
